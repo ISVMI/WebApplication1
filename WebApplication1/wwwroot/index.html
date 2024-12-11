@@ -1,0 +1,160 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>TEST</title>
+    <style>
+        input {
+            width: 150px;
+        }
+
+            input:invalid {
+                border-color: red;
+            }
+
+            input:valid {
+                border-color: green;
+            }
+
+        #taskList {
+            width: auto;
+        }
+    </style>
+</head>
+<body>
+    <form id="taskForm" name="taskForm" method="post">
+        <p>
+            <label for="task">Задача:</label><br />
+            <input type="text" id="task" name="task" required minlength="3"><br />
+            <label for="taskDescription">Описание:</label><br />
+            <textarea id="taskDescription" name="taskDescription"></textarea><br />
+            <label for="taskPriorities">Выберите приоритет:</label><br />
+            <select id="taskPriorities" required>
+                <option value="highPriority">Важная</option>
+                <option value="normalPriority">Обычная</option>
+                <option value="lowPriority">Неважная</option>
+            </select>
+        </p>
+        <input type="submit" id="addTask" name="addTask" value="Добавить задачу">
+        
+    </form><br />
+           <div>
+               <select id="taskList" multiple>
+               </select><br />
+               <button id="completeTask" name="taskComplete">Завершить</button>
+               <button id="removeTask" name="removeTask">Удалить задачу</button><br>
+               <button id="sortTask" name="sortTask">Сортировать по приоритету</button>
+           </div>
+    <script>
+        //Получение элементов формы
+        const tasks = document.getElementById("taskList");
+        const form = document.getElementById("taskForm");
+        let taskIsCompleted = "нет";
+        let taskList = document.getElementById("taskList");
+        //Функция добавления задачи
+        function addTask(event) {
+            //Запрет отправки формы и перезагрузки страницы
+            event.preventDefault();
+            //Получение введённых данных
+            let taskName = form.elements["task"].value.trim();
+            let taskDescription = form.elements["taskDescription"].value;
+            let taskPriority = document.getElementById("taskPriorities").value;
+            //Проверка на пустое имя
+            if (taskName === "") {
+                window.alert("Введите название задачи!");
+                return;
+            }
+            //Для каждой задачи
+            for (let option of taskList.options) {
+                //Проверка на повторяющееся имя
+                if (option.id === taskName) {
+                    //Проверка на приоритет (Если приоритет другой, то меняем его у имеющейся задачи)
+                    if (!(option.name === taskPriority)) {
+                        option.text = `Задача: ${taskName} Описание: ${taskDescription} Приоритет: ${taskPriority} Завершена: ${taskIsCompleted}`;
+                        option.value = taskIsCompleted;
+                        option.name = taskPriority;
+                        option.id = taskName;
+                        window.alert("Приоритет был изменён");
+                        return;
+                    }
+                    //Оповещение пользователя о неудачном добавлении
+                    else {
+                        window.alert("Такая задача уже существует!");
+                        return;
+                    }
+                }
+            }
+            //Добавление задачи
+            let option = document.createElement("option");
+            option.text = `Задача: ${taskName} Описание: ${taskDescription} Приоритет: ${taskPriority} Завершена: ${taskIsCompleted}`;
+            option.value = taskIsCompleted;
+            option.name = taskPriority;
+            option.id = taskName;
+            option.style.backgroundColor = "grey";
+            tasks.appendChild(option);
+            form.reset();
+        }
+        //Функция конвертации приоритета в число (для сортировки)
+        function priorityConvertion(taskopt) {
+            switch (taskopt.name) {
+                case "highPriority": return 3;
+                case "normalPriority": return 2;
+                case "lowPriority": return 1;
+            }
+        }
+        //Сортировка по приоритету
+        function sortTask() {
+            const taskArr = Array.from(taskList.options).sort((a, b) => {
+                return priorityConvertion(b) - priorityConvertion(a);
+            })
+            taskList.innerHTML = '';
+            taskArr.forEach(option => taskList.appendChild(option));
+        }
+        //Удаление выбранных задач
+        function deleteTask() {
+            for (let i = taskList.options.length - 1; i >= 0; i--) {
+                if (taskList.options[i].selected) {
+                    taskList.remove(i);
+                }
+            }
+        }
+        //"Завершение" выбранных задач
+        function completeTask() {
+            // Получаем выбранные опции
+            const selectedOptions = Array.from(taskList.selectedOptions);
+
+            // Проверяем, выбраны ли задачи
+            if (selectedOptions.length === 0) {
+                window.alert("Выберите хотя бы одну задачу!");
+                return;
+            }
+            let errTask;
+
+            selectedOptions.forEach(selectedOpt => {
+                // Проверка, что задача еще не завершена
+                if (selectedOpt.value === "нет") {
+                    selectedOpt.value = "да";
+                    // Изменение текста задачи
+                    selectedOpt.text = selectedOpt.text.replace("Завершена: нет", "Завершена: да");
+                    selectedOpt.style.backgroundColor = "green";
+                }
+                else {
+                    errTask = selectedOpt.id;
+                    window.alert(`Выбранная задача ${errTask} уже завершена!`);
+                }
+            });
+            // Снимаем выделение после завершения
+            taskList.selectedIndex = -1;
+        }
+
+        const submitBtn = document.getElementById("addTask");
+        submitBtn.addEventListener("click", addTask);
+        const sortBtn = document.getElementById("sortTask");
+        sortBtn.addEventListener("click", sortTask);
+        const deleteBtn = document.getElementById("removeTask");
+        deleteBtn.addEventListener("click", deleteTask);
+        const completeBtn = document.getElementById("completeTask");
+        completeBtn.addEventListener("click", completeTask);
+    </script>
+</body>
+</html>
