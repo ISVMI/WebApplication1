@@ -24,6 +24,7 @@
 <body>
     <form id="taskForm" name="taskForm" method="post">
         <p>
+            <input type = "hidden" id = "taskId" />
             <label for="task">Задача:</label><br />
             <input type="text" id="task" name="task" required minlength="3"><br />
             <label for="taskDescription">Описание:</label><br />
@@ -36,125 +37,277 @@
             </select>
         </p>
         <input type="submit" id="addTask" name="addTask" value="Добавить задачу">
-        
+        <input type="reset" id="reset" name="reset" value="Сбросить">
     </form><br />
            <div>
-               <select id="taskList" multiple>
-               </select><br />
-               <button id="completeTask" name="taskComplete">Завершить</button>
-               <button id="removeTask" name="removeTask">Удалить задачу</button><br>
-               <button id="sortTask" name="sortTask">Сортировать по приоритету</button>
+               <table>
+                   <thead><tr><th>Название</th><th>Описание</th><th>Приоритет</th><th>Завершена?</th></tr></thead>
+                   <tbody>
+                   </tbody>
+               </table>
            </div>
     <script>
-        //Получение элементов формы
-        const tasks = document.getElementById("taskList");
-        const form = document.getElementById("taskForm");
-        let taskIsCompleted = "нет";
-        let taskList = document.getElementById("taskList");
-        //Функция добавления задачи
-        function addTask(event) {
-            //Запрет отправки формы и перезагрузки страницы
-            event.preventDefault();
-            //Получение введённых данных
-            let taskName = form.elements["task"].value.trim();
-            let taskDescription = form.elements["taskDescription"].value;
-            let taskPriority = document.getElementById("taskPriorities").value;
-            //Проверка на пустое имя
-            if (taskName === "") {
-                window.alert("Введите название задачи!");
-                return;
-            }
-            //Для каждой задачи
-            for (let option of taskList.options) {
-                //Проверка на повторяющееся имя
-                if (option.id === taskName) {
-                    //Проверка на приоритет (Если приоритет другой, то меняем его у имеющейся задачи)
-                    if (!(option.name === taskPriority)) {
-                        option.text = `Задача: ${taskName} Описание: ${taskDescription} Приоритет: ${taskPriority} Завершена: ${taskIsCompleted}`;
-                        option.value = taskIsCompleted;
-                        option.name = taskPriority;
-                        option.id = taskName;
-                        window.alert("Приоритет был изменён");
-                        return;
-                    }
-                    //Оповещение пользователя о неудачном добавлении
-                    else {
-                        window.alert("Такая задача уже существует!");
-                        return;
-                    }
-                }
-            }
-            //Добавление задачи
-            let option = document.createElement("option");
-            option.text = `Задача: ${taskName} Описание: ${taskDescription} Приоритет: ${taskPriority} Завершена: ${taskIsCompleted}`;
-            option.value = taskIsCompleted;
-            option.name = taskPriority;
-            option.id = taskName;
-            option.style.backgroundColor = "grey";
-            tasks.appendChild(option);
-            form.reset();
+
+        function getRandom(min, max) {
+            return Math.random() * (max - min) + min;
         }
+
         //Функция конвертации приоритета в число (для сортировки)
-        function priorityConvertion(taskopt) {
-            switch (taskopt.name) {
+        function priorityConvertion(option) {
+            switch (option) {
                 case "highPriority": return 3;
                 case "normalPriority": return 2;
                 case "lowPriority": return 1;
+                default: return 0;
             }
         }
-        //Сортировка по приоритету
-        function sortTask() {
-            const taskArr = Array.from(taskList.options).sort((a, b) => {
-                return priorityConvertion(b) - priorityConvertion(a);
-            })
-            taskList.innerHTML = '';
-            taskArr.forEach(option => taskList.appendChild(option));
+        // Получение всех задач
+        async function getTasks() {
+            // отправляет запрос и получаем ответ
+            const response = await fetch("/api/tasks", {
+                method: "GET",
+                headers: { "Accept": "application/json" }
+            });
+            // если запрос прошел нормально
+            if (response.ok === true) {
+                // получаем данные
+                const tasks = await response.json();
+                const rows = document.querySelector("tbody");
+                // добавляем полученные элементы в таблицу
+                tasks.forEach(task => { rows.append(row(task)); console.log(task); });
+                
+            }
         }
-        //Удаление выбранных задач
-        function deleteTask() {
-            for (let i = taskList.options.length - 1; i >= 0; i--) {
-                if (taskList.options[i].selected) {
-                    taskList.remove(i);
+        // Получение одной задачи
+        async function getTask(id) {
+            const response = await fetch(`/api/tasks/${id}`, {
+                method: "GET",
+                headers: { "Accept": "application/json" }
+            });
+            if (response.ok === true) {
+                const task = await response.json();
+                document.getElementById("taskId").value = task.id;
+                document.getElementById("task").value = task.name;
+                document.getElementById("taskDescription").value = task.description;
+                let taskPriorities = document.getElementById("taskPriorities");
+                for (option of taskPriorities.options) {
+                    if (option.value == task.priority)
+                        option.selected = true;
                 }
             }
+            else {
+                // если произошла ошибка, получаем сообщение об ошибке
+                const error = await response.json();
+                console.log(error.message); // и выводим его на консоль
+            }
         }
-        //"Завершение" выбранных задач
-        function completeTask() {
-            // Получаем выбранные опции
-            const selectedOptions = Array.from(taskList.selectedOptions);
+        // Добавление задачи
+        async function createTask( taskName, taskDescription, taskPriority, taskIsCompleted) {
+            try {
+                if (!taskName) {
+                    throw new Error("Введите название задачи!");
+                }
+            const response = await fetch("api/tasks", {
+                method: "POST",
+                headers: { "Accept": "application/json", "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    Id: Math.floor(getRandom(1, 10000)).toString(),
+                    Name: taskName,
+                    Description: taskDescription,
+                    Priority: taskPriority,
+                    IsCompleted: taskIsCompleted
+                })
+            });
+            if (response.ok === true) {
+                const task = await response.json();
+                document.querySelector("tbody").append(row(task));
+                sortTasks();
+            }
+            else {
+                const error = await response.json();
+                console.log(error.message);
+                }
+            } catch (error) {
+                console.error("Ошибка:", error);
+            }
+        }
+        // Изменение задачи
+        async function editTask(taskId, taskName, taskDescription, taskPriority, taskIsCompleted) {
+            const response = await fetch(`/api/tasks/${taskId}`, {
+                method: "PUT",
+                headers: { "Accept": "application/json", "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    Id: taskId,
+                    Name: taskName,
+                    Description: taskDescription,
+                    Priority: taskPriority,
+                    IsCompleted: taskIsCompleted
+                })
+            });
+            if (response.ok === true) {
+                const task = await response.json();
+                document.querySelector(`tr[data-rowid="${task.id}"]`).replaceWith(row(task));
+            }
+            else {
+                const error = await response.json();
+                console.log(error.message);
+            }
+        }
+        // Удаление задачи
+        async function deleteTask(id) {
+            const response = await fetch(`/api/tasks/${id}`, {
+                method: "DELETE",
+                headers: { "Accept": "application/json" }
+            });
+            if (response.ok === true) {
+                const task = await response.json();
+                document.querySelector(`tr[data-rowid="${task.id}"]`).remove();
+            }
+            else {
+                const error = await response.json();
+                console.log(error.message);
+            }
+        }
+        async function completeTask(id) {
+            try {
+                const response = await fetch(`/api/tasks/${id}/complete`, {
+                    method: "PATCH",
+                    headers: {
+                        "Accept": "application/json",
+                        "Content-Type": "application/json"
+                    }
+                });
 
-            // Проверяем, выбраны ли задачи
-            if (selectedOptions.length === 0) {
-                window.alert("Выберите хотя бы одну задачу!");
+                const task = await response.json();
+
+                // Если задача уже завершена
+                if (task.isCompleted) {
+                    const confirmDelete = confirm("Задача уже завершена. Хотите удалить её?");
+
+                    if (confirmDelete) {
+                        // Вызываем метод удаления задачи
+                        await deleteTask(id);
+                    }
+                    return;
+                }
+
+                // Находим строку задачи
+                const taskRow = document.querySelector(`tr[data-rowid="${task.id}"]`);
+
+                // Обновляем строку ПРИНУДИТЕЛЬНО
+                taskRow.replaceWith(row(task));
+
+            } catch (error) {
+                console.error("Ошибка:", error);
+            }
+        }
+
+        //Сортировка по приоритету
+        async function sortTasks() {
+            const response = await fetch("/api/tasks", {
+                method: "GET",
+                headers: { "Accept": "application/json" }
+            });
+            if (response.ok === true) {
+                const tasks = await response.json();
+                const tbody = document.querySelector('tbody');
+                const tasksArr = Array.from(tbody.rows);
+                // Сортировка задач
+                const sortedTasks = tasksArr.sort((a, b) => {
+                    let cella = a.cells[2].textContent;
+                    let cellb = b.cells[2].textContent;
+                    const priorityA = priorityConvertion(cella);
+                    const priorityB = priorityConvertion(cellb);
+                    return priorityB - priorityA;
+                });
+
+                // Очистка текущей таблицы
+                tbody.innerHTML = '';
+
+                // Перерисовка отсортированных задач
+                sortedTasks.forEach(task => {
+                    tbody.appendChild(task);
+                });
+            }
+            else {
+                const error = await response.json();
+                console.log(error.message);
+            }
+        }
+
+        // сброс данных формы после отправки
+        function reset() {
+            document.getElementById("taskId").value = "";
+            document.getElementById("task").value = "";
+            document.getElementById("taskDescription").value = "";
+            let taskPriorities = document.getElementById("taskPriorities");
+            taskPriorities.options[0].selected = true;
+        }
+        // создание строки для таблицы
+        function row(task) {
+            const tr = document.createElement("tr");
+            tr.setAttribute("data-rowid", task.id);
+
+            const nameTd = document.createElement("td");
+            nameTd.append(task.name);
+            tr.append(nameTd);
+
+            const descTd = document.createElement("td");
+            descTd.append(task.description);
+            tr.append(descTd);
+
+            const priorityTd = document.createElement("td");
+            priorityTd.append(task.priority);
+            tr.append(priorityTd);
+
+            const completedTd = document.createElement("td");
+            let status = task.isCompleted ? "да" : "нет";
+            completedTd.append(status);
+            tr.append(completedTd);
+
+            const linksTd = document.createElement("td");
+
+            const editLink = document.createElement("button");
+            editLink.append("Изменить");
+            editLink.addEventListener("click", async () => await getTask(task.id));
+            linksTd.append(editLink);
+
+            const removeLink = document.createElement("button");
+            removeLink.append("Удалить");
+            removeLink.addEventListener("click", async () => await deleteTask(task.id));
+            linksTd.append(removeLink);
+
+            const completeLink = document.createElement("button");
+            completeLink.append("Завершить");
+            completeLink.addEventListener("click", async () => await completeTask(task.id));
+            linksTd.append(completeLink);
+
+            tr.appendChild(linksTd);
+
+            return tr;
+        }
+        // сброс значений формы
+        document.getElementById("reset").addEventListener("click", () => reset());
+
+        // отправка формы
+        document.getElementById("addTask").addEventListener("click", async () => {
+            event.preventDefault();
+            const id = document.getElementById("taskId").value;
+            const name = document.getElementById("task").value;
+            const description = document.getElementById("taskDescription").value;
+            const priority = document.getElementById("taskPriorities").value;
+            let IsCompleted = false;
+            if (!name) {
+                alert("Введите название задачи!");
                 return;
             }
-            let errTask;
-
-            selectedOptions.forEach(selectedOpt => {
-                // Проверка, что задача еще не завершена
-                if (selectedOpt.value === "нет") {
-                    selectedOpt.value = "да";
-                    // Изменение текста задачи
-                    selectedOpt.text = selectedOpt.text.replace("Завершена: нет", "Завершена: да");
-                    selectedOpt.style.backgroundColor = "green";
-                }
-                else {
-                    errTask = selectedOpt.id;
-                    window.alert(`Выбранная задача ${errTask} уже завершена!`);
-                }
-            });
-            // Снимаем выделение после завершения
-            taskList.selectedIndex = -1;
-        }
-
-        const submitBtn = document.getElementById("addTask");
-        submitBtn.addEventListener("click", addTask);
-        const sortBtn = document.getElementById("sortTask");
-        sortBtn.addEventListener("click", sortTask);
-        const deleteBtn = document.getElementById("removeTask");
-        deleteBtn.addEventListener("click", deleteTask);
-        const completeBtn = document.getElementById("completeTask");
-        completeBtn.addEventListener("click", completeTask);
+            if (id === "")
+                await createTask(name, description, priority, IsCompleted);
+            else
+            await editTask(id, name, description, priority, IsCompleted);
+            reset();
+        });
+        getTasks();
     </script>
 </body>
 </html>
