@@ -178,10 +178,10 @@
                     }
                 });
 
-                const task = await response.json();
+                const result = await response.json();
 
-                // Если задача уже завершена
-                if (task.isCompleted) {
+                // Проверяем успешность операции
+                if (!result.success) {
                     const confirmDelete = confirm("Задача уже завершена. Хотите удалить её?");
 
                     if (confirmDelete) {
@@ -190,6 +190,8 @@
                     }
                     return;
                 }
+
+                const task = result.task;
 
                 // Находим строку задачи
                 const taskRow = document.querySelector(`tr[data-rowid="${task.id}"]`);
@@ -303,8 +305,12 @@
             }
             if (id === "")
                 await createTask(name, description, priority, IsCompleted);
-            else
-            await editTask(id, name, description, priority, IsCompleted);
+            else {
+                taskRow = document.querySelector(`tr[data-rowid="${id}"]`);
+                if (taskRow.cells[3].textContent === "да")
+                IsCompleted = true;
+                await editTask(id, name, description, priority, IsCompleted);
+            }
             reset();
         });
         getTasks();

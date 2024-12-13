@@ -89,8 +89,7 @@ app.MapPatch("/api/tasks/{id}/complete", async (string id, ApplicationContext db
         // Устанавливаем статус завершенности
         task.IsCompleted = true;
         await db.SaveChangesAsync();
-
-    return Results.Json(task);
+    return Results.Json(new { success = true, task = task });
 });
 
 app.Run();
